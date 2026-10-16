@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Integral Explorer</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f4f7fb; color: #172033; }
+  main { max-width: 900px; margin: auto; }
+  h1 { margin-bottom: 6px; }
+  .intro { color: #536178; margin-top: 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .card { background: white; border: 1px solid #d8dfeb; border-radius: 12px; padding: 16px; margin: 14px 0; }
+  .slider-row { display: grid; grid-template-columns: 42px 1fr 42px; gap: 8px; align-items: center; margin: 12px 0; }
+  input[type="range"] { width: 100%; accent-color: #2563eb; }
+  output { text-align: right; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .formula { font-family: Consolas, monospace; overflow-wrap: anywhere; color: #263e69; }
+  .result { font-size: 1.8rem; font-weight: bold; margin: 12px 0 4px; }
+  .muted { color: #5c687d; font-size: .92rem; }
+  svg { display: block; width: 100%; max-width: 420px; margin: auto; }
+  button { border: 0; border-radius: 8px; background: #2563eb; color: white; padding: 11px 15px; margin: 5px 6px 0 0; cursor: pointer; font-size: 1rem; }
+  button.secondary { background: #526176; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #f59e0b; outline-offset: 2px; }
+  @media (max-width: 480px) { body { padding: 12px; } .card { padding: 13px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Interactive Integral Explorer</h1>
+  <p class="intro">Move the six sliders to change the lower and upper limits of x, y, and z. Results update automatically.</p>
+
+  <div class="grid">
+    <section class="card">
+      <h2>x limits</h2>
+      <div class="slider-row"><label for="xlo">Min</label><input id="xlo" type="range" min="-5" max="5" step="0.5" value="0"><output id="oxlo">0</output></div>
+      <div class="slider-row"><label for="xhi">Max</label><input id="xhi" type="range" min="-5" max="5" step="0.5" value="2"><output id="oxhi">2</output></div>
+      <p class="muted">Span along x</p>
+    </section>
+    <section class="card">
+      <h2>y limits</h2>
+      <div class="slider-row"><label for="ylo">Min</label><input id="ylo" type="range" min="-5" max="5" step="0.5" value="0"><output id="oylo">0</output></div>
+      <div class="slider-row"><label for="yhi">Max</label><input id="yhi" type="range" min="-5" max="5" step="0.5" value="3"><output id="oyhi">3</output></div>
+      <p class="muted">Span along y</p>
+    </section>
+    <section class="card">
+      <h2>z limits</h2>
+      <div class="slider-row"><label for="zlo">Min</label><input id="zlo" type="range" min="-5" max="5" step="0.5" value="0"><output id="ozlo">0</output></div>
+      <div class="slider-row"><label for="zhi">Max</label><input id="zhi" type="range" min="-5" max="5" step="0.5" value="4"><output id="ozhi">4</output></div>
+      <p class="muted">Span along z</p>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Visual representation</h2>
+    <p class="muted">Schematic box: its proportions respond to the sizes of the x, y, and z spans.</p>
+    <svg viewBox="0 0 360 190" role="img" aria-label="Schematic cuboid showing three dimensions">
+      <polygon id="top" points="60,60 180,60 230,30 110,30" fill="#8bbde8" stroke="#23476c" stroke-width="1.5"/>
+      <polygon id="side" points="180,60 230,30 230,120 180,150" fill="#8fc9a3" stroke="#23476c" stroke-width="1.5"/>
+      <polygon id="front" points="60,60 180,60 180,150 60,150" fill="#f0c37d" stroke="#23476c" stroke-width="1.5"/>
+      <g font-size="13" fill="#172033">
+        <text id="xlabel" x="120" y="169" text-anchor="middle">x span</text>
+        <text id="ylabel" x="220" y="25" text-anchor="middle">y span</text>
+        <text id="zlabel" x="246" y="100">z span</text>
+      </g>
+    </svg>
+    <p id="limits" class="muted" aria-live="polite"></p>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>1. Single integral</h2>
+      <p class="formula">∫ from x-min to x-max 1 dx</p>
+      <div class="result" id="single">2</div>
+      <p class="muted">Signed length along x.</p>
+      <p class="formula" id="singleWork"></p>
+    </section>
+    <section class="card">
+      <h2>2. Double integral</h2>
+      <p class="formula">∫∫ 1 dx dy</p>
+      <div class="result" id="double">6</div>
+      <p class="muted">Signed area in the xy-plane.</p>
+      <p class="formula" id="doubleWork"></p>
+    </section>
+    <section class="card">
+      <h2>3. Triple integral</h2>
+      <p class="formula">∫∫∫ 1 dx dy dz</p>
+      <div class="result" id="triple">24</div>
+      <p class="muted">Signed volume over the box.</p>
+      <p class="formula" id="tripleWork"></p>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>What does this show?</h2>
+    <p>A single integral uses one variable; a double integral uses two; a triple integral uses three. Because the function being integrated is 1, these results are products of the corresponding limit differences.</p>
+    <p id="note" class="muted" aria-live="polite"></p>
+    <button id="reset" type="button">Reset limits</button>
+    <button id="negative" class="secondary" type="button">Try negative/reversed limits</button>
+  </section>
+</main>
+<script>
+(() => {
+  const keys = ["xlo", "xhi", "ylo", "yhi", "zlo", "zhi"];
+  const defaults = {xlo: 0, xhi: 2, ylo: 0, yhi: 3, zlo: 0, zhi: 4};
+  const fmt = n => Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  const get = k => Number(document.getElementById(k).value);
+  const setText = (id, value) => document.getElementById(id).textContent = value;
+
+  function update() {
+    const v = {};
+    keys.forEach(k => {
+      v[k] = get(k);
+      setText("o" + k, fmt(v[k]));
+    });
+
+    const dx = v.xhi - v.xlo;
+    const dy = v.yhi - v.ylo;
+    const dz = v.zhi - v.zlo;
+    const single = dx;
+    const double = dx * dy;
+    const triple = dx * dy * dz;
+
+    setText("single", fmt(single));
+    setText("double", fmt(double));
+    setText("triple", fmt(triple));
+    setText("singleWork", `= ${fmt(v.xhi)} − (${fmt(v.xlo)}) = ${fmt(dx)}`);
+    setText("doubleWork", `= (${fmt(dx)}) × (${fmt(dy)}) = ${fmt(double)}`);
+    setText("tripleWork", `= (${fmt(dx)}) × (${fmt(dy)}) × (${fmt(dz)}) = ${fmt(triple)}`);
+    setText("limits", `x: ${fmt(v.xlo)} to ${fmt(v.xhi)} · y: ${fmt(v.ylo)} to ${fmt(v.yhi)} · z: ${fmt(v.zlo)} to ${fmt(v.zhi)}`);
+
+    setText("note", `Geometric sizes: x length = ${fmt(Math.abs(dx))}, xy area = ${fmt(Math.abs(double))}, box volume = ${fmt(Math.abs(triple))}. Definite integrals are signed, so reversing a pair of limits changes the sign.`);
+
+    const sx = Math.max(.55, Math.min(1.55, Math.abs(dx) / 2 || .55));
+    const sy = Math.max(.55, Math.min(1.55, Math.abs(dy) / 3 || .55));
+    const sz = Math.max(.55, Math.min(1.55, Math.abs(dz) / 4 || .55));
+    const x = 60, y = 68, w = 120 * sx, h = 82 * sz, ox = 50 * sy, oy = -30 * sy;
+    document.getElementById("front").setAttribute("points", `${x},${y} ${x+w},${y} ${x+w},${y+h} ${x},${y+h}`);
+    document.getElementById("top").setAttribute("points", `${x},${y} ${x+w},${y} ${x+w+ox},${y+oy} ${x+ox},${y+oy}`);
+    document.getElementById("side").setAttribute("points", `${x+w},${y} ${x+w+ox},${y+oy} ${x+w+ox},${y+oy+h} ${x+w},${y+h}`);
+    setText("xlabel", `x span: ${fmt(Math.abs(dx))}`);
+    setText("ylabel", `y span: ${fmt(Math.abs(dy))}`);
+    setText("zlabel", `z: ${fmt(Math.abs(dz))}`);
+  }
+
+  keys.forEach(k => document.getElementById(k).addEventListener("input", update));
+  document.getElementById("reset").addEventListener("click", () => {
+    keys.forEach(k => document.getElementById(k).value = defaults[k]);
+    update();
+  });
+  document.getElementById("negative").addEventListener("click", () => {
+    const example = {xlo: 2, xhi: -2, ylo: -1, yhi: 3, zlo: 1, zhi: 4};
+    keys.forEach(k => document.getElementById(k).value = example[k]);
+    update();
+  });
+  update();
+})();
+</script>
+</body>
+</html>

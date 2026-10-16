@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3D Robot Arm Simulator</title>
+<style>
+body{margin:0;background:#111;color:#eee;font-family:Arial,sans-serif}
+main{max-width:800px;margin:auto;padding:14px}
+canvas{display:block;width:100%;height:auto;background:#181818;border-radius:12px;touch-action:none}
+.controls{background:#202020;padding:14px;border-radius:12px;margin-top:12px}
+.row{display:grid;grid-template-columns:90px 1fr 60px;gap:10px;align-items:center;margin:12px 0}
+input[type=range]{width:100%}
+button{padding:10px 16px;border:0;border-radius:8px;cursor:pointer}
+small{color:#aaa}
+</style>
+</head>
+<body>
+<main>
+<h2>3D Robot Arm Simulator</h2>
+<canvas id="c" width="760" height="430"></canvas>
+<div class="controls">
+<div class="row"><label>Joint 1</label><input id="a1" type="range" min="0" max="360" value="35"><b id="v1">35°</b></div>
+<div class="row"><label>Joint 2</label><input id="a2" type="range" min="0" max="360" value="55"><b id="v2">55°</b></div>
+<div class="row"><label>Joint 3</label><input id="a3" type="range" min="0" max="360" value="40"><b id="v3">40°</b></div>
+<button id="reset">Reset</button>
+<p><small>Drag the canvas to rotate the 3D view. Move the sliders to rotate the three joints.</small></p>
+</div>
+</main>
+<script>
+const c=document.getElementById("c"),ctx=c.getContext("2d");
+let yaw=.6,pitch=.35,drag=false,lastX=0,lastY=0;
+const ids=["a1","a2","a3"], vals=["v1","v2","v3"], L=[125,100,80];
+
+function P(p){
+ const [x,y,z]=p,cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
+ const X=x*cy-z*sy, Z=x*sy+z*cy;
+ const Y=y*cp-Z*sp, ZZ=y*sp+Z*cp;
+ const s=260/(ZZ+520);
+ return [c.width/2+X*s,c.height/2-Y*s,s];
+}
+function line(a,b,w){
+ const A=P(a),B=P(b);ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);
+ ctx.lineWidth=w;ctx.lineCap="round";ctx.stroke();
+}
+function dot(p,r){
+ const q=P(p);ctx.beginPath();ctx.arc(q[0],q[1],r,0,Math.PI*2);
+ ctx.fillStyle="#ddd";ctx.fill();ctx.strokeStyle="#111";ctx.lineWidth=3;ctx.stroke();
+}
+function draw(){
+ ctx.clearRect(0,0,c.width,c.height);
+ // floor grid
+ ctx.strokeStyle="#444";ctx.lineWidth=1;
+ for(let i=-3;i<=3;i++){line([-210,0,i*70],[210,0,i*70],1);line([i*70,0,-210],[i*70,0,210],1)}
+ // axes
+ ctx.strokeStyle="#777";line([0,0,0],[180,0,0],2);line([0,0,0],[0,150,0],2);line([0,0,0],[0,0,180],2);
+
+ const a=ids.map(id=>+document.getElementById(id).value*Math.PI/180);
+ vals.forEach((v,i)=>document.getElementById(v).textContent=Math.round(a[i]*180/Math.PI)+"°");
+
+ // 3D forward kinematics: joint 1 rotates around vertical Y axis;
+ // joints 2 and 3 bend in the resulting vertical plane.
+ let p=[[0,0,0]], t2=a[1], t3=a[1]+a[2];
+ const az=a[0];
+ p.push([L[0]*Math.cos(az),L[0]*Math.sin(az),0]);
+ const r2=L[1]*Math.cos(t2), h2=L[1]*Math.sin(t2);
+ p.push([p[1][0]+r2*Math.cos(az),p[1][1]+r2*Math.sin(az),h2]);
+ const r3=L[2]*Math.cos(t3), h3=L[2]*Math.sin(t3);
+ p.push([p[2][0]+r3*Math.cos(az),p[2][1]+r3*Math.sin(az),h3]);
+
+ ctx.strokeStyle="#eee";
+ for(let i=0;i<3;i++)line(p[i],p[i+1],20);
+ p.forEach((q,i)=>dot(q,i?13:16));
+
+ const e=P(p[3]);ctx.fillStyle="#fff";ctx.font="bold 15px Arial";
+ ctx.fillText("End effector",e[0]+12,e[1]-12);
+}
+ids.forEach(id=>document.getElementById(id).addEventListener("input",draw));
+document.getElementById("reset").onclick=()=>{[35,55,40].forEach((v,i)=>document.getElementById(ids[i]).value=v);draw()};
+c.addEventListener("pointerdown",e=>{drag=true;lastX=e.clientX;lastY=e.clientY;c.setPointerCapture(e.pointerId)});
+c.addEventListener("pointermove",e=>{
+ if(!drag)return;
+ yaw+=(e.clientX-lastX)*.01;
+ pitch=Math.max(-1.2,Math.min(1.2,pitch+(e.clientY-lastY)*.01));
+ lastX=e.clientX;lastY=e.clientY;draw();
+});
+c.addEventListener("pointerup",()=>drag=false);
+c.addEventListener("pointercancel",()=>drag=false);
+draw();
+</script>
+</body>
+</html>

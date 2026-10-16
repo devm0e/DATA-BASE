@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gauss Divergence Theorem Simulator</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: #eef3f9;
+    color: #18243a;
+}
+
+main {
+    max-width: 1000px;
+    margin: auto;
+}
+
+h1 { font-size: 25px; }
+
+.card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin: 14px 0;
+    border: 1px solid #d7e0ed;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 12px;
+}
+
+label {
+    display: block;
+    margin: 12px 0 5px;
+    font-weight: bold;
+}
+
+input, select {
+    width: 100%;
+    accent-color: #2563eb;
+}
+
+select {
+    padding: 9px;
+    border: 1px solid #b9c5d7;
+    border-radius: 7px;
+    background: white;
+}
+
+.value {
+    color: #2563eb;
+    font-weight: bold;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: 360px;
+    border: 1px solid #d7e0ed;
+    border-radius: 9px;
+    background: #f9fbff;
+    touch-action: pan-y;
+}
+
+button {
+    padding: 11px 15px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 7px;
+    background: #2563eb;
+    color: white;
+    font-size: 15px;
+}
+
+.result {
+    font-size: 21px;
+    font-weight: bold;
+    color: #087443;
+    overflow-wrap: anywhere;
+}
+
+.formula {
+    font-family: "Courier New", monospace;
+    overflow-wrap: anywhere;
+    line-height: 1.8;
+}
+
+.small {
+    color: #5d6b80;
+    font-size: 14px;
+    line-height: 1.6;
+}
+</style>
+</head>
+
+<body>
+<main>
+
+<h1>Gauss's Divergence Theorem</h1>
+
+<p class="small">
+Explore a closed 3D surface. Change its dimensions and the vector
+field to compare the flux through the surface with the divergence
+integrated throughout the volume.
+</p>
+
+<div class="card">
+    <h2>1. Interactive 3D Surface</h2>
+
+    <canvas id="scene" width="900" height="540"
+        aria-label="Interactive three-dimensional box with vector field arrows">
+    </canvas>
+
+    <p class="small">
+        Drag horizontally to rotate the box. Arrows represent the
+        vector field. The colored box represents the closed surface.
+    </p>
+</div>
+
+<div class="grid">
+
+<div class="card">
+    <h2>2. Box Dimensions</h2>
+
+    <label>
+        Half-length a:
+        <span class="value" id="av">2.0</span>
+    </label>
+    <input id="a" type="range" min="0.5" max="4"
+        value="2" step="0.5">
+
+    <label>
+        Half-width b:
+        <span class="value" id="bv">2.0</span>
+    </label>
+    <input id="b" type="range" min="0.5" max="4"
+        value="2" step="0.5">
+
+    <label>
+        Half-height c:
+        <span class="value" id="cv">2.0</span>
+    </label>
+    <input id="c" type="range" min="0.5" max="4"
+        value="2" step="0.5">
+</div>
+
+<div class="card">
+    <h2>3. Vector Field</h2>
+
+    <label for="field">Choose a field</label>
+    <select id="field">
+        <option value="radial">F = (x, y, z)</option>
+        <option value="expanding">F = (2x, 2y, 2z)</option>
+        <option value="constant">F = (1, 1, 1)</option>
+        <option value="mixed">F = (x, 2y, 3z)</option>
+        <option value="saddle">F = (x, -y, 0)</option>
+    </select>
+
+    <p class="small" id="fieldDescription">
+        A radial field pointing outward from the origin.
+    </p>
+
+    <button id="reset" type="button">Reset simulation</button>
+</div>
+
+</div>
+
+<div class="card">
+    <h2>4. The Theorem</h2>
+
+    <div class="formula">
+        ∯∯S F · n dS  = ∭V (∇ · F) dV
+    </div>
+
+    <p>
+        Left side: total outward flux through the six faces of the box.
+    </p>
+    <p>
+        Right side: total divergence accumulated inside the box.
+    </p>
+</div>
+
+<div class="grid">
+
+<div class="card">
+    <h2>Surface Integral</h2>
+    <p class="small">Total outward flux through all six faces</p>
+    <div class="result" id="flux">—</div>
+    <div class="formula" id="fluxDetails"></div>
+</div>
+
+<div class="card">
+    <h2>Volume Integral</h2>
+    <p class="small">Integral of divergence throughout the box</p>
+    <div class="result" id="volume">—</div>
+    <div class="formula" id="divDetails"></div>
+</div>
+
+</div>
+
+<div class="card">
+    <h2>5. What does this tell us?</h2>
+    <p id="explanation"></p>
+    <p class="formula" id="verification"></p>
+    <p class="small">
+        The displayed results are calculated analytically for the
+        selected field and rectangular box. The 3D drawing is a
+        visualization, not a numerical integration method.
+    </p>
+</div>
+
+</main>
+
+<script>
+const canvas = document.getElementById("scene");
+const ctx = canvas.getContext("2d");
+
+const controls = ["a", "b", "c", "field"];
+const $ = id => document.getElementById(id);
+
+let angle = -0.65;
+let dragging = false;
+let lastX = 0;
+
+const descriptions = {
+    radial: "F = (x, y, z). The field points away from the origin. Its divergence is 3.",
+    expanding: "F = (2x, 2y, 2z). A stronger outward field with divergence 6.",
+    constant: "F = (1, 1, 1). A uniform field with zero divergence.",
+    mixed: "F = (x, 2y, 3z). Divergence is 1 + 2 + 3 = 6.",
+    saddle: "F = (x, -y, 0). Expansion along x is balanced by contraction along y; divergence is zero."
+};
+
+function fieldAt(x, y, z, type) {
+    switch (type) {
+        case "radial": return [x, y, z];
+        case "expanding": return [2*x, 2*y, 2*z];
+        case "constant": return [1, 1, 1];
+        case "mixed": return [x, 2*y, 3*z];
+        case "saddle": return [x, -y, 0];
+        default: return [x, y, z];
+    }
+}
+
+function divergence(type) {
+    return {
+        radial: 3,
+        expanding: 6,
+        constant: 0,
+        mixed: 6,
+        saddle: 0
+    }[type];
+}
+
+function fmt(n) {
+    if (Math.abs(n) < 1e-9) return "0";
+    return Number(n.toFixed(4)).toString();
+}
+
+function project(x, y, z, a, b, c) {
+    // Rotate around the vertical axis.
+    const xr = x * Math.cos(angle) - y * Math.sin(angle);
+    const yr = x * Math.sin(angle) + y * Math.cos(angle);
+
+    const scale = Math.min(
+        canvas.width / 12,
+        canvas.height / 10
+    );
+
+    return {
+        x: canvas.width / 2 + scale * (xr - 0.55 * yr),
+        y: canvas.height / 2 + scale *
+            (0.45 * xr + 0.45 * yr - z)
+    };
+}
+
+function polygon(points, fill, stroke = "#31445f") {
+    ctx.beginPath();
+    points.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+}
+
+function drawArrow(x1, y1, x2, y2, color = "#1769aa") {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.hypot(dx, dy);
+    if (length < 2) return;
+
+    const ux = dx / length;
+    const uy = dy / length;
+    const head = Math.min(7, length * 0.3);
+
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 1.7;
+
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - head * ux + head * 0.55 * uy,
+               y2 - head * uy - head * 0.55 * ux);
+    ctx.lineTo(x2 - head * ux - head * 0.55 * uy,
+               y2 - head * uy + head * 0.55 * ux);
+    ctx.closePath();
+    ctx.fill();
+}
+
+function draw() {
+    const a = Number($("a").value);
+    const b = Number($("b").value);
+    const c = Number($("c").value);
+    const type = $("field").value;
+
+    $("av").textContent = fmt(a);
+    $("bv").textContent = fmt(b);
+    $("cv").textContent = fmt(c);
+    $("fieldDescription").textContent = descriptions[type];
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Box corners.
+    const p = {};
+    for (const x of [-a, a])
+        for (const y of [-b, b])
+            for (const z of [-c, c])
+                p[`${x},${y},${z}`] = project(x,y,z,a,b,c);
+
+    const P = (x,y,z) => p[`${x},${y},${z}`];
+
+    // Faces, using translucent colors.
+    polygon([P(-a,-b,-c),P(a,-b,-c),P(a,b,-c),P(-a,b,-c)],
+            "rgba(238,190,106,0.25)");
+    polygon([P(-a,-b,c),P(a,-b,c),P(a,b,c),P(-a,b,c)],
+            "rgba(76,160,220,0.35)");
+    polygon([P(-a,-b,-c),P(a,-b,-c),P(a,-b,c),P(-a,-b,c)],
+            "rgba(235,150,90,0.25)");
+    polygon([P(-a,b,-c),P(a,b,-c),P(a,b,c),P(-a,b,c)],
+            "rgba(90,180,140,0.25)");
+    polygon([P(-a,-b,-c),P(-a,b,-c),P(-a,b,c),P(-a,-b,c)],
+            "rgba(155,130,220,0.22)");
+    polygon([P(a,-b,-c),P(a,b,-c),P(a,b,c),P(a,-b,c)],
+            "rgba(220,100,130,0.22)");
+
+    // Draw field arrows inside the box on a small grid.
+    const n = 3;
+    for (let i = 0; i <= n; i++) {
+        for (let j = 0; j <= n; j++) {
+            for (let k = 0; k <= n; k++) {
+                const x = -a + 2*a*i/n;
+                const y = -b + 2*b*j/n;
+                const z = -c + 2*c*k/n;
+
+                const f = fieldAt(x,y,z,type);
+                const start = project(x,y,z,a,b,c);
+                const factor = 0.20;
+                const end = project(
+                    x + f[0]*factor,
+                    y + f[1]*factor,
+                    z + f[2]*factor,
+                    a,b,c
+                );
+                drawArrow(start.x,start.y,end.x,end.y);
+            }
+        }
+    }
+
+    // Axes through the origin.
+    const o = project(0,0,0,a,b,c);
+    const xEnd = project(a*1.15,0,0,a,b,c);
+    const yEnd = project(0,b*1.15,0,a,b,c);
+    const zEnd = project(0,0,c*1.15,a,b,c);
+
+    drawArrow(o.x,o.y,xEnd.x,xEnd.y,"#b45309");
+    drawArrow(o.x,o.y,yEnd.x,yEnd.y,"#15803d");
+    drawArrow(o.x,o.y,zEnd.x,zEnd.y,"#7c3aed");
+
+    ctx.fillStyle = "#172033";
+    ctx.font = "bold 17px Arial";
+    ctx.fillText("x",xEnd.x+5,xEnd.y);
+    ctx.fillText("y",yEnd.x+5,yEnd.y);
+    ctx.fillText("z",zEnd.x+5,zEnd.y);
+
+    // Analytical surface flux:
+    // F=(A*x, B*y, C*z), with coefficients selected by field.
+    const coeff = {
+        radial: [1,1,1],
+        expanding: [2,2,2],
+        constant: [0,0,0],
+        mixed: [1,2,3],
+        saddle: [1,-1,0]
+    }[type];
+
+    // Each pair of faces contributes coefficient * 2*side lengths product.
+    const fluxX = coeff[0] * (2*a) * (2*b) * (2*c) / (2*a);
+    const fluxY = coeff[1] * (2*a) * (2*b) * (2*c) / (2*b);
+    const fluxZ = coeff[2] * (2*a) * (2*b) * (2*c) / (2*c);
+
+    // These simplify to 8abc times each coefficient.
+    const fx = 8*a*b*c*coeff[0];
+    const fy = 8*a*b*c*coeff[1];
+    const fz = 8*a*b*c*coeff[2];
+    const totalFlux = fx + fy + fz;
+
+    const volume = (2*a)*(2*b)*(2*c);
+    const volumeIntegral = divergence(type)*volume;
+
+    $("flux").textContent = fmt(totalFlux);
+    $("volume").textContent = fmt(volumeIntegral);
+    $("fluxDetails").innerHTML =
+        `x-faces: ${fmt(fx)}<br>` +
+        `y-faces: ${fmt(fy)}<br>` +
+        `z-faces: ${fmt(fz)}`;
+
+    $("divDetails").textContent =
+        `Divergence = ${fmt(divergence(type))} · Box volume = ${fmt(volume)}`;
+
+    $("explanation").textContent =
+        `For this field, the divergence is ${fmt(divergence(type))} everywhere. ` +
+        `The box volume is ${fmt(volume)}. Multiplying them gives ` +
+        `${fmt(volumeIntegral)}. The outward flux through the six faces is ` +
+        `${fmt(totalFlux)}.`;
+
+    $("verification").textContent =
+        `Surface flux − volume integral = ${fmt(totalFlux-volumeIntegral)}. ` +
+        (Math.abs(totalFlux-volumeIntegral) < 1e-8
+            ? "Both sides are equal: the theorem is verified."
+            : "Check the field and calculations.");
+}
+
+controls.forEach(id => $(id).addEventListener("input", draw));
+
+$("reset").addEventListener("click", () => {
+    $("a").value = 2;
+    $("b").value = 2;
+    $("c").value = 2;
+    $("field").value = "radial";
+    angle = -0.65;
+    draw();
+});
+
+canvas.addEventListener("pointerdown", e => {
+    dragging = true;
+    lastX = e.clientX;
+    canvas.setPointerCapture(e.pointerId);
+});
+
+canvas.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX;
+    lastX = e.clientX;
+    angle += dx * 0.01;
+    draw();
+});
+
+canvas.addEventListener("pointerup", () => dragging = false);
+canvas.addEventListener("pointercancel", () => dragging = false);
+
+draw();
+</script>
+</body>
+</html>

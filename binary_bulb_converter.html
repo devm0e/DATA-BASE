@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binary Bulb Converter</title>
+<style>
+  :root { --bg:#0b1220; --panel:#131f33; --panel2:#1a2a43; --text:#eef5ff; --muted:#a8bad3; --accent:#55d6be; --off:#42516a; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; padding:24px 14px 40px;
+    background:radial-gradient(circle at top, #1a3150 0, var(--bg) 55%);
+    color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  }
+  main { max-width:1000px; margin:auto; }
+  header { text-align:center; margin:8px 0 24px; }
+  h1 { margin:0 0 8px; font-size:clamp(1.7rem,5vw,2.6rem); }
+  header p { margin:0; color:var(--muted); }
+  .panel { background:rgba(19,31,51,.94); border:1px solid #2a3e5d; border-radius:18px; padding:20px; margin:16px 0; box-shadow:0 12px 35px #0002; }
+  h2 { margin:0 0 16px; font-size:1.2rem; }
+  .bulbs { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; }
+  .bulb-card { background:var(--panel2); border:1px solid #304561; border-radius:14px; padding:14px 8px; text-align:center; }
+  .bulb-number { color:var(--muted); font-size:.85rem; margin-bottom:9px; }
+  .bulb {
+    width:38px; height:38px; margin:0 auto 12px; border-radius:50% 50% 44% 44%;
+    background:#586579; border:3px solid #8592a5; position:relative; transition:all .18s ease;
+  }
+  .bulb::after { content:""; position:absolute; width:15px; height:8px; left:8px; bottom:-10px; border-radius:2px; background:#9aa8b9; }
+  .bulb.on { background:#ffe783; border-color:#fff4b0; box-shadow:0 0 12px #ffd84d,0 0 28px #ffd84d88; }
+  .bulb.on::after { background:#d9c56e; }
+  .switch { display:flex; align-items:center; justify-content:center; gap:7px; cursor:pointer; font-size:.9rem; }
+  .switch input { appearance:none; width:43px; height:24px; border-radius:20px; background:#47566d; position:relative; margin:0; cursor:pointer; transition:background .2s; }
+  .switch input::before { content:""; position:absolute; width:18px; height:18px; top:3px; left:3px; border-radius:50%; background:white; transition:transform .2s; }
+  .switch input:checked { background:#18a58c; }
+  .switch input:checked::before { transform:translateX(19px); }
+  .state { display:block; margin-top:9px; font-weight:700; color:var(--muted); }
+  .state.on { color:var(--accent); }
+  .bit-row { display:flex; flex-wrap:wrap; gap:7px; }
+  .bit { min-width:34px; padding:9px 7px; border-radius:8px; background:#263750; border:1px solid #3c526f; text-align:center; font-weight:800; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+  .bit.one { background:#14594f; border-color:#26b69e; color:#baffef; }
+  .result-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+  .result { background:#0d1727; border:1px solid #304561; border-radius:12px; padding:14px; min-width:0; }
+  .result .label { color:var(--muted); font-size:.82rem; margin-bottom:8px; }
+  .result .value { font-size:clamp(1.05rem,3vw,1.55rem); font-weight:800; overflow-wrap:anywhere; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+  button { border:0; border-radius:10px; padding:11px 15px; font-weight:750; cursor:pointer; color:#07131d; background:var(--accent); }
+  button.secondary { color:var(--text); background:#304561; }
+  .note { color:var(--muted); font-size:.9rem; line-height:1.5; margin:14px 0 0; }
+  @media (max-width:650px) {
+    .bulbs { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .result-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .panel { padding:15px; }
+  }
+  @media (min-width:420px) and (max-width:650px) { .bulbs { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>💡 Binary Bulb Converter</h1>
+    <p>Switch ten bulbs ON or OFF and watch the number change in four number systems.</p>
+  </header>
+
+  <section class="panel">
+    <h2>1. Control the bulbs</h2>
+    <div class="bulbs" id="bulbs"></div>
+    <div class="actions">
+      <button id="randomize">Randomize bulbs</button>
+      <button class="secondary" id="allOn">All ON</button>
+      <button class="secondary" id="allOff">All OFF</button>
+    </div>
+    <p class="note">ON = <strong>1</strong> · OFF = <strong>0</strong>. Bulb 1 is the leftmost bit (the most significant bit); bulb 10 is the rightmost bit.</p>
+  </section>
+
+  <section class="panel">
+    <h2>2. Binary representation</h2>
+    <div class="bit-row" id="binaryBits" aria-label="Binary bits"></div>
+  </section>
+
+  <section class="panel">
+    <h2>3. Number conversions</h2>
+    <div class="result-grid">
+      <div class="result"><div class="label">Binary (base 2)</div><div class="value" id="binary">—</div></div>
+      <div class="result"><div class="label">Octal (base 8)</div><div class="value" id="octal">—</div></div>
+      <div class="result"><div class="label">Decimal (base 10)</div><div class="value" id="decimal">—</div></div>
+      <div class="result"><div class="label">Hexadecimal (base 16)</div><div class="value" id="hex">—</div></div>
+    </div>
+    <p class="note">The same 10-bit pattern is shown in different bases. The decimal value can range from 0 (all bulbs OFF) to 1023 (all bulbs ON).</p>
+  </section>
+</main>
+<script>
+  const bulbsContainer = document.getElementById('bulbs');
+  const switches = [];
+
+  for (let i = 0; i < 10; i++) {
+    const card = document.createElement('div');
+    card.className = 'bulb-card';
+    card.innerHTML = `
+      <div class="bulb-number">Bulb ${i + 1}</div>
+      <div class="bulb" id="bulb-${i}" aria-hidden="true"></div>
+      <label class="switch" for="switch-${i}">
+        <span>OFF</span>
+        <input type="checkbox" id="switch-${i}" aria-label="Toggle bulb ${i + 1}">
+        <span>ON</span>
+      </label>
+      <span class="state" id="state-${i}">0 · OFF</span>`;
+    bulbsContainer.appendChild(card);
+    const input = card.querySelector('input');
+    input.addEventListener('change', update);
+    switches.push(input);
+  }
+
+  function update() {
+    const bits = switches.map((input, i) => {
+      const isOn = input.checked;
+      document.getElementById(`bulb-${i}`).classList.toggle('on', isOn);
+      const state = document.getElementById(`state-${i}`);
+      state.textContent = isOn ? '1 · ON' : '0 · OFF';
+      state.classList.toggle('on', isOn);
+      return isOn ? '1' : '0';
+    }).join('');
+
+    const value = parseInt(bits, 2);
+    document.getElementById('binary').textContent = bits;
+    document.getElementById('octal').textContent = value.toString(8);
+    document.getElementById('decimal').textContent = value.toString(10);
+    document.getElementById('hex').textContent = value.toString(16).toUpperCase();
+
+    const bitsBox = document.getElementById('binaryBits');
+    bitsBox.replaceChildren();
+    [...bits].forEach((bit, i) => {
+      const span = document.createElement('span');
+      span.className = 'bit' + (bit === '1' ? ' one' : '');
+      span.textContent = bit;
+      span.title = `Bulb ${i + 1}: ${bit === '1' ? 'ON' : 'OFF'}`;
+      bitsBox.appendChild(span);
+    });
+  }
+
+  document.getElementById('randomize').addEventListener('click', () => {
+    switches.forEach(input => input.checked = Math.random() < 0.5);
+    update();
+  });
+  document.getElementById('allOn').addEventListener('click', () => {
+    switches.forEach(input => input.checked = true);
+    update();
+  });
+  document.getElementById('allOff').addEventListener('click', () => {
+    switches.forEach(input => input.checked = false);
+    update();
+  });
+
+  // Start with a random ON/OFF pattern.
+  switches.forEach(input => input.checked = Math.random() < 0.5);
+  update();
+</script>
+</body>
+</html>
